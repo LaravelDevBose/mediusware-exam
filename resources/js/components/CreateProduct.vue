@@ -24,7 +24,15 @@
                         <h6 class="m-0 font-weight-bold text-primary">Media</h6>
                     </div>
                     <div class="card-body border">
-                        <vue-dropzone ref="myVueDropzone" id="dropzone" :options="dropzoneOptions"></vue-dropzone>
+                        <vue-dropzone
+                            ref="myVueDropzone"
+                            id="dropzone"
+                            :options="dropzoneOptions"
+                            @vdropzone-complete="vcomplete"
+                        ></vue-dropzone>
+                    </div>
+                    <div class="card-body" v-if="responseInfo.show">
+                        <div class="alert" :class="responseInfo.alert_class" v-html="responseInfo.message"> </div>
                     </div>
                 </div>
             </div>
@@ -91,7 +99,8 @@
             </div>
         </div>
 
-        <button @click="saveProduct" type="submit" class="btn btn-lg btn-primary">Save</button>
+        <button @click="updateProduct" v-if="product" type="submit" class="btn btn-lg btn-primary">Update</button>
+        <button @click="saveProduct" v-else type="submit" class="btn btn-lg btn-primary">Save</button>
         <button type="button" class="btn btn-secondary btn-lg">Cancel</button>
     </section>
 </template>
@@ -110,6 +119,10 @@ export default {
         variants: {
             type: Array,
             required: true
+        },
+        product: {
+            type: Object,
+            required: false,
         }
     },
     data() {
@@ -130,6 +143,11 @@ export default {
                 thumbnailWidth: 150,
                 maxFilesize: 0.5,
                 headers: {"My-Awesome-Header": "header value"}
+            },
+            responseInfo:{
+                message: '',
+                alert_class: 'alert-info',
+                show: false,
             }
         }
     },
@@ -190,18 +208,128 @@ export default {
 
 
             axios.post('/product', product).then(response => {
-                console.log(response.data);
+                console.log(response);
+                this.responseInfo.show = true;
+                if (response.data.status === 201){
+                    this.responseInfo.alert_class = 'alert-success';
+                    this.responseInfo.message = response.data.message;
+                    setTimeout(()=>{
+                        window.location.href = '/product';
+                    }, 3000);
+                }else if(response.data.status === 400 || response.data.status === 406){
+                    this.responseInfo.alert_class = 'alert-danger';
+                    this.responseInfo.message = response.data.message;
+                }else{
+                    this.responseInfo.alert_class = 'alert-warning';
+                    this.responseInfo.message ='Something Wrong. try again.';
+                }
             }).catch(error => {
-                console.log(error);
+                console.log(error)
+                this.responseInfo.show = true;
+                if(error.data.status === 400 || error.data.status === 406){
+                    this.responseInfo.alert_class = 'alert-danger';
+                    this.responseInfo.message = error.data.message;
+                }else{
+                    this.responseInfo.alert_class = 'alert-warning';
+                    this.responseInfo.message ='Something Wrong. try again.';
+                }
+            });
+        },
+        vcomplete(res){
+            this.images.push(res.dataURL);
+            console.log(this.images);
+        },
+        updateEditData(){
+            this.product_name = this.product.title;
+            this.product_sku = this.product.sku;
+            this.description = this.product.description;
+            this.product_variant= this.product.variants;
+            let self = this;
+            setTimeout(()=>{
+                self.product_variant_prices.length = 0;
+                self.product.variant_prices.filter((item)=>{
+                    let data = {
+                        title: item.title,
+                        price: item.price,
+                        stock: item.stock
+                    }
+                    console.log(data);
+                    self.product_variant_prices.push(data);
+                }, 3000);
+            });
+            this.product.images.filter((item)=>{
+                var file = { size: 123, name: "Icon", type: "image/png" };
+                this.$refs.myVueDropzone.manuallyAddFile(file, item);
             })
 
-            console.log(product);
-        }
+        },
 
+        updateProduct() {
+            let product = {
+                title: this.product_name,
+                sku: this.product_sku,
+                description: this.description,
+                product_image: this.images,
+                product_variant: this.product_variant,
+                product_variant_prices: this.product_variant_prices
+            }
+
+
+            axios.put(`/product/${this.product.id}`, product).then(response => {
+                console.log(response);
+                this.responseInfo.show = true;
+                if (response.data.status === 200){
+                    this.responseInfo.alert_class = 'alert-success';
+                    this.responseInfo.message = response.data.message;
+                    setTimeout(()=>{
+                        window.location.href = '/product';
+                    }, 3000);
+                }else if(response.data.status === 400 || response.data.status === 406){
+                    this.responseInfo.alert_class = 'alert-danger';
+                    this.responseInfo.message = response.data.message;
+                }else{
+                    this.responseInfo.alert_class = 'alert-warning';
+                    this.responseInfo.message ='Something Wrong. try again.';
+                }
+            }).catch(error => {
+                console.log(error)
+                this.responseInfo.show = true;
+                if(error.data.status === 400 || error.data.status === 406){
+                    this.responseInfo.alert_class = 'alert-danger';
+                    this.responseInfo.message = error.data.message;
+                }else{
+                    this.responseInfo.alert_class = 'alert-warning';
+                    this.responseInfo.message ='Something Wrong. try again.';
+                }
+            });
+        },
 
     },
     mounted() {
-        console.log('Component mounted.')
+        console.log('Component mounted.');
+        this.updateEditData();
+    },
+    watch:{
+        product_variant:{
+            handler(newVal, oldVal){
+                if (newVal !== oldVal){
+                    this.checkVariant();
+                }
+            }
+        },
+        responseInfo:{
+            handler(newVal, oldVal){
+                if (newVal !== oldVal){
+                    let self = this;
+                    setTimeout(()=>{
+                        self.responseInfo.alert_class = 'alert-warning';
+                        self.responseInfo.message ='Something Wrong. try again.';
+                        self.responseInfo.show = false;
+                    }, 2000)
+                }
+            }
+        }
+
     }
 }
 </script>

@@ -2012,6 +2012,15 @@ __webpack_require__.r(__webpack_exports__);
 //
 //
 //
+//
+//
+//
+//
+//
+//
+//
+//
+//
 
 
 
@@ -2024,6 +2033,10 @@ __webpack_require__.r(__webpack_exports__);
     variants: {
       type: Array,
       required: true
+    },
+    product: {
+      type: Object,
+      required: false
     }
   },
   data: function data() {
@@ -2044,6 +2057,11 @@ __webpack_require__.r(__webpack_exports__);
         headers: {
           "My-Awesome-Header": "header value"
         }
+      },
+      responseInfo: {
+        message: '',
+        alert_class: 'alert-info',
+        show: false
       }
     };
   },
@@ -2100,6 +2118,8 @@ __webpack_require__.r(__webpack_exports__);
     },
     // store product into database
     saveProduct: function saveProduct() {
+      var _this2 = this;
+
       var product = {
         title: this.product_name,
         sku: this.product_sku,
@@ -2109,15 +2129,135 @@ __webpack_require__.r(__webpack_exports__);
         product_variant_prices: this.product_variant_prices
       };
       axios.post('/product', product).then(function (response) {
-        console.log(response.data);
+        console.log(response);
+        _this2.responseInfo.show = true;
+
+        if (response.data.status === 201) {
+          _this2.responseInfo.alert_class = 'alert-success';
+          _this2.responseInfo.message = response.data.message;
+          setTimeout(function () {
+            window.location.href = '/product';
+          }, 3000);
+        } else if (response.data.status === 400 || response.data.status === 406) {
+          _this2.responseInfo.alert_class = 'alert-danger';
+          _this2.responseInfo.message = response.data.message;
+        } else {
+          _this2.responseInfo.alert_class = 'alert-warning';
+          _this2.responseInfo.message = 'Something Wrong. try again.';
+        }
       })["catch"](function (error) {
         console.log(error);
+        _this2.responseInfo.show = true;
+
+        if (error.data.status === 400 || error.data.status === 406) {
+          _this2.responseInfo.alert_class = 'alert-danger';
+          _this2.responseInfo.message = error.data.message;
+        } else {
+          _this2.responseInfo.alert_class = 'alert-warning';
+          _this2.responseInfo.message = 'Something Wrong. try again.';
+        }
       });
-      console.log(product);
+    },
+    vcomplete: function vcomplete(res) {
+      this.images.push(res.dataURL);
+      console.log(this.images);
+    },
+    updateEditData: function updateEditData() {
+      var _this3 = this;
+
+      this.product_name = this.product.title;
+      this.product_sku = this.product.sku;
+      this.description = this.product.description;
+      this.product_variant = this.product.variants;
+      var self = this;
+      setTimeout(function () {
+        self.product_variant_prices.length = 0;
+        self.product.variant_prices.filter(function (item) {
+          var data = {
+            title: item.title,
+            price: item.price,
+            stock: item.stock
+          };
+          console.log(data);
+          self.product_variant_prices.push(data);
+        }, 3000);
+      });
+      this.product.images.filter(function (item) {
+        var file = {
+          size: 123,
+          name: "Icon",
+          type: "image/png"
+        };
+
+        _this3.$refs.myVueDropzone.manuallyAddFile(file, item);
+      });
+    },
+    updateProduct: function updateProduct() {
+      var _this4 = this;
+
+      var product = {
+        title: this.product_name,
+        sku: this.product_sku,
+        description: this.description,
+        product_image: this.images,
+        product_variant: this.product_variant,
+        product_variant_prices: this.product_variant_prices
+      };
+      axios.put("/product/".concat(this.product.id), product).then(function (response) {
+        console.log(response);
+        _this4.responseInfo.show = true;
+
+        if (response.data.status === 200) {
+          _this4.responseInfo.alert_class = 'alert-success';
+          _this4.responseInfo.message = response.data.message;
+          setTimeout(function () {
+            window.location.href = '/product';
+          }, 3000);
+        } else if (response.data.status === 400 || response.data.status === 406) {
+          _this4.responseInfo.alert_class = 'alert-danger';
+          _this4.responseInfo.message = response.data.message;
+        } else {
+          _this4.responseInfo.alert_class = 'alert-warning';
+          _this4.responseInfo.message = 'Something Wrong. try again.';
+        }
+      })["catch"](function (error) {
+        console.log(error);
+        _this4.responseInfo.show = true;
+
+        if (error.data.status === 400 || error.data.status === 406) {
+          _this4.responseInfo.alert_class = 'alert-danger';
+          _this4.responseInfo.message = error.data.message;
+        } else {
+          _this4.responseInfo.alert_class = 'alert-warning';
+          _this4.responseInfo.message = 'Something Wrong. try again.';
+        }
+      });
     }
   },
   mounted: function mounted() {
     console.log('Component mounted.');
+    this.updateEditData();
+  },
+  watch: {
+    product_variant: {
+      handler: function handler(newVal, oldVal) {
+        if (newVal !== oldVal) {
+          this.checkVariant();
+        }
+      }
+    },
+    responseInfo: {
+      handler: function handler(newVal, oldVal) {
+        if (newVal !== oldVal) {
+          var self = this;
+          setTimeout(function () {
+            self.responseInfo.alert_class = 'alert-warning';
+            self.responseInfo.message = 'Something Wrong. try again.';
+            self.responseInfo.show = false;
+          }, 2000);
+        }
+      }
+    }
   }
 });
 
@@ -50566,11 +50706,22 @@ var render = function() {
             [
               _c("vue-dropzone", {
                 ref: "myVueDropzone",
-                attrs: { id: "dropzone", options: _vm.dropzoneOptions }
+                attrs: { id: "dropzone", options: _vm.dropzoneOptions },
+                on: { "vdropzone-complete": _vm.vcomplete }
               })
             ],
             1
-          )
+          ),
+          _vm._v(" "),
+          _vm.responseInfo.show
+            ? _c("div", { staticClass: "card-body" }, [
+                _c("div", {
+                  staticClass: "alert",
+                  class: _vm.responseInfo.alert_class,
+                  domProps: { innerHTML: _vm._s(_vm.responseInfo.message) }
+                })
+              ])
+            : _vm._e()
         ])
       ]),
       _vm._v(" "),
@@ -50774,15 +50925,25 @@ var render = function() {
       ])
     ]),
     _vm._v(" "),
-    _c(
-      "button",
-      {
-        staticClass: "btn btn-lg btn-primary",
-        attrs: { type: "submit" },
-        on: { click: _vm.saveProduct }
-      },
-      [_vm._v("Save")]
-    ),
+    _vm.product
+      ? _c(
+          "button",
+          {
+            staticClass: "btn btn-lg btn-primary",
+            attrs: { type: "submit" },
+            on: { click: _vm.updateProduct }
+          },
+          [_vm._v("Update")]
+        )
+      : _c(
+          "button",
+          {
+            staticClass: "btn btn-lg btn-primary",
+            attrs: { type: "submit" },
+            on: { click: _vm.saveProduct }
+          },
+          [_vm._v("Save")]
+        ),
     _vm._v(" "),
     _c(
       "button",
@@ -63300,8 +63461,8 @@ __webpack_require__.r(__webpack_exports__);
 /*! no static exports found */
 /***/ (function(module, exports, __webpack_require__) {
 
-__webpack_require__(/*! /home/rifat/Programming/mediusware/interview/interview-question-sr/resources/js/app.js */"./resources/js/app.js");
-module.exports = __webpack_require__(/*! /home/rifat/Programming/mediusware/interview/interview-question-sr/resources/sass/app.scss */"./resources/sass/app.scss");
+__webpack_require__(/*! D:\xampp\htdocs\interview-question-sr\resources\js\app.js */"./resources/js/app.js");
+module.exports = __webpack_require__(/*! D:\xampp\htdocs\interview-question-sr\resources\sass\app.scss */"./resources/sass/app.scss");
 
 
 /***/ })
